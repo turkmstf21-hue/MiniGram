@@ -1,0 +1,6 @@
+body {
+    background-color: black;   /* arka plan siyah */
+    color: white;              /* yazýlar beyaz */
+    text-align: center;        /* ortaya hizala */
+    font-family: Arial, sans-serif; /* yazý tipi */
+}
