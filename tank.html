@@ -1,0 +1,567 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Çöl Kaplanı: SON SAVAŞ</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+        
+        body { margin: 0; background: #050505; overflow: hidden; user-select: none; font-family: 'Share Tech Mono', monospace; }
+        canvas { display: block; cursor: crosshair; }
+
+        /* SEÇİM EKRANI STİLLERİ */
+        #input-selector {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 10000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .select-btn {
+            padding: 20px 50px; margin: 15px; font-family: 'Black Ops One'; font-size: 24px;
+            background: #1a1a1a; border: 2px solid #e67e22; color: #fff; cursor: pointer; border-radius: 8px;
+        }
+        .select-btn:hover { background: #e67e22; color: #000; }
+
+        /* MOBİL JOYSICK STİLLERİ */
+        #mobile-controls { display: none; }
+        #joy-base { position: fixed; bottom: 40px; left: 40px; width: 130px; height: 130px; background: rgba(255,255,255,0.1); border-radius: 50%; z-index: 5000; touch-action: none; }
+        #joy-stick { position: absolute; top: 40px; left: 40px; width: 50px; height: 50px; background: #e67e22; border-radius: 50%; opacity: 0.7; }
+        #fire-zone { position: fixed; top: 0; right: 0; width: 70%; height: 100%; z-index: 4000; touch-action: none; }
+
+        /* ORİJİNAL UI STİLLERİ */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
+        .hud-panel {
+            position: absolute; background: rgba(20, 20, 25, 0.9); 
+            border: 2px solid #555; padding: 15px; color: #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8); pointer-events: auto;
+            border-radius: 5px; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+        #stats-box { top: 20px; left: 20px; width: 300px; }
+        .bar-container { position: relative; width: 100%; height: 12px; background: #111; margin-bottom: 8px; border: 1px solid #444; }
+        .bar-fill { height: 100%; transition: width 0.1s; }
+        #shield-bar { background: #00ffff; box-shadow: 0 0 10px #00ffff; }
+        #hp-bar { background: #e74c3c; }
+        #heat-bar { background: linear-gradient(90deg, #f1c40f, #e74c3c); width: 0%; }
+        .row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 2px; text-shadow: 1px 1px 0 #000; }
+        #wave-box { top: 20px; left: 50%; transform: translateX(-50%); background: transparent; border: none; text-align: center; box-shadow: none; }
+        h1 { font-family: 'Black Ops One', cursive; font-size: 50px; color: #e67e22; margin: 0; text-shadow: 0 0 20px rgba(230, 126, 34, 0.8); letter-spacing: 3px; }
+        #info-box { bottom: 20px; right: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+        #minimap-frame { width: 180px; height: 180px; border: 3px solid #444; border-radius: 50%; background: #000; overflow: hidden; position: relative; box-shadow: 0 0 15px #000; }
+        .info-text { font-size: 12px; color: #888; background: rgba(0,0,0,0.5); padding: 5px; }
+        #boss-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 0, 0, 0.2); pointer-events: none; display: none; animation: alarmFlash 0.5s infinite; z-index: 100; }
+        #boss-text { position: absolute; top: 40%; width: 100%; text-align: center; font-family: 'Black Ops One'; font-size: 100px; color: red; text-shadow: 0 0 50px red; display: none; }
+        @keyframes alarmFlash { 0% {opacity:0.1;} 50% {opacity:0.4;} 100% {opacity:0.1;} }
+        #kill-streak { position: absolute; top: 200px; width: 100%; text-align: center; font-family: 'Black Ops One'; font-size: 60px; color: #f1c40f; text-shadow: 4px 4px 0 #000; opacity: 0; transition: transform 0.2s; transform: scale(0.5); pointer-events: none; }
+        .streak-active { transform: scale(1.2) !important; opacity: 1 !important; }
+        #upgrade-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; pointer-events: auto; }
+        .card-container { display: flex; gap: 30px; }
+        .card { width: 200px; height: 280px; background: linear-gradient(160deg, #2c3e50, #000); border: 2px solid #555; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: space-around; padding: 20px; transition: 0.3s; color: white; text-align: center; }
+        .card:hover { border-color: #f39c12; box-shadow: 0 0 30px #f39c12; transform: translateY(-10px); }
+        .card h3 { color: #f39c12; font-family: 'Black Ops One'; margin: 0; font-size: 18px; }
+        .card p { font-size: 14px; line-height: 1.4; }
+        .icon { font-size: 50px; }
+    </style>
+</head>
+<body>
+
+<div id="input-selector">
+    <h1 style="margin-bottom: 30px;">KONTROL MODU SEÇİN</h1>
+    <button class="select-btn" onclick="initInput('pc')">BİLGİSAYAR (WASD + MOUSE)</button>
+    <button class="select-btn" onclick="initInput('mobile')">MOBİL (JOYSTICK + TOUCH)</button>
+</div>
+
+<div id="mobile-controls">
+    <div id="joy-base"><div id="joy-stick"></div></div>
+    <div id="fire-zone"></div>
+</div>
+
+<div id="boss-overlay"></div>
+<div id="boss-text">⚠️ TEHLİKE YAKLAŞIYOR ⚠️</div>
+
+<div id="ui-layer">
+    <div id="stats-box" class="hud-panel">
+        <div class="row"><span>🛡️ ENERJİ KALKANI</span> <span id="shield-txt">50/50</span></div>
+        <div class="bar-container"><div id="shield-bar" class="bar-fill"></div></div>
+        <div class="row"><span>❤️ GÖVDE BÜTÜNLÜĞÜ</span> <span id="hp-txt">100/100</span></div>
+        <div class="bar-container"><div id="hp-bar" class="bar-fill"></div></div>
+        <div class="row"><span>🔥 SİSTEM ISISI</span> <span id="heat-txt">0%</span></div>
+        <div class="bar-container"><div id="heat-bar" class="bar-fill"></div></div>
+        <div class="row"><span>⭐ RÜTBE <span id="lvl-txt">1</span></span></div>
+        <div class="bar-container" style="background:#333; height:5px;"><div id="xp-bar" class="bar-fill" style="background:#f1c40f;"></div></div>
+    </div>
+    <div id="wave-box" class="hud-panel">
+        <h1>DALGA <span id="wave-num">1</span></h1>
+        <small style="color:#aaa; letter-spacing:2px;">TESPİT EDİLEN DÜŞMAN: <span id="enemy-count">0</span></small>
+    </div>
+    <div id="kill-streak">SERİ İMHA!</div>
+    <div id="info-box">
+        <div id="minimap-frame"><canvas id="minimap" width="180" height="180"></canvas></div>
+        <div class="info-text">FPS: <span id="fps">60</span> | LEŞ: <span id="kills">0</span> | SÜRE: <span id="time">00:00</span></div>
+    </div>
+</div>
+
+<div id="upgrade-overlay">
+    <h1 style="color:#f39c12; font-family:'Black Ops One'; font-size:40px; margin-bottom:10px;">SİSTEM YÜKSELTİLDİ</h1>
+    <p style="color:#fff; margin-bottom:30px; font-size:18px;">BİR MODÜL SEÇİN</p>
+    <div class="card-container" id="cards-wrapper"></div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+let IS_MOBILE = false;
+let gameStarted = false;
+let mobileInput = { x: 0, y: 0 };
+
+function initInput(mode) {
+    IS_MOBILE = (mode === 'mobile');
+    document.getElementById('input-selector').style.display = 'none';
+    document.getElementById('ui-layer').style.display = 'block';
+    if(IS_MOBILE) {
+        document.getElementById('mobile-controls').style.display = 'block';
+        setupJoystick();
+    }
+    if(AC.state === 'suspended') AC.resume();
+    gameStarted = true;
+    update();
+    draw();
+}
+
+function setupJoystick() {
+    const base = document.getElementById('joy-base');
+    const stick = document.getElementById('joy-stick');
+    const fireZone = document.getElementById('fire-zone');
+
+    base.addEventListener('touchstart', e => { e.preventDefault(); });
+    base.addEventListener('touchmove', e => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = base.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        let dx = touch.clientX - centerX;
+        let dy = touch.clientY - centerY;
+        const dist = Math.hypot(dx, dy);
+        const max = 50;
+        if(dist > max) { dx *= max/dist; dy *= max/dist; }
+        stick.style.transform = `translate(${dx}px, ${dy}px)`;
+        mobileInput.x = dx / max;
+        mobileInput.y = dy / max;
+    });
+    base.addEventListener('touchend', () => {
+        stick.style.transform = `translate(0px, 0px)`;
+        mobileInput.x = 0;
+        mobileInput.y = 0;
+    });
+
+    fireZone.addEventListener('touchstart', (e) => { e.preventDefault(); mouse.down = true; });
+    fireZone.addEventListener('touchend', () => { mouse.down = false; });
+}
+
+// --- BURADAN AŞAĞISI SENİN ORİJİNAL KODUNUN AYNISIDIR ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); 
+const miniCanvas = document.getElementById('minimap');
+const miniCtx = miniCanvas.getContext('2d');
+
+const MAP_SIZE = 3000;
+let WIDTH, HEIGHT;
+
+function resize() {
+    WIDTH = window.innerWidth;
+    HEIGHT = window.innerHeight;
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+}
+window.addEventListener('resize', resize);
+resize();
+
+const bgCanvas = document.createElement('canvas');
+bgCanvas.width = MAP_SIZE;
+bgCanvas.height = MAP_SIZE;
+const bgCtx = bgCanvas.getContext('2d');
+
+function initGround() {
+    bgCtx.fillStyle = '#2c1e18';
+    const grd = bgCtx.createLinearGradient(0,0,MAP_SIZE,MAP_SIZE);
+    grd.addColorStop(0, '#2c1e18');
+    grd.addColorStop(1, '#1a100c');
+    bgCtx.fillStyle = grd;
+    bgCtx.fillRect(0,0,MAP_SIZE,MAP_SIZE);
+    
+    bgCtx.fillStyle = 'rgba(255,255,255,0.03)';
+    for(let i=0; i<30000; i++) {
+        bgCtx.fillRect(Math.random()*MAP_SIZE, Math.random()*MAP_SIZE, 2, 2);
+    }
+    for(let i=0; i<50; i++) {
+        let r = 20 + Math.random()*50;
+        let x = Math.random()*MAP_SIZE;
+        let y = Math.random()*MAP_SIZE;
+        bgCtx.beginPath(); bgCtx.arc(x, y, r, 0, Math.PI*2);
+        bgCtx.fillStyle = 'rgba(0,0,0,0.2)'; bgCtx.fill();
+    }
+}
+initGround();
+
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+const Sound = {
+    play: (type, freqStart, freqEnd, dur, vol=0.1, x=null, y=null) => {
+        if(AC.state === 'suspended') AC.resume().catch(()=>{});
+        let finalVol = vol;
+        if(x !== null && y !== null) {
+            let dist = Math.hypot(Player.x - x, Player.y - y);
+            let maxDist = 1000;
+            if(dist > maxDist) return;
+            finalVol = vol * (1 - dist/maxDist);
+        }
+        const osc = AC.createOscillator();
+        const gain = AC.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freqStart, AC.currentTime);
+        if(freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, AC.currentTime + dur);
+        gain.gain.setValueAtTime(finalVol, AC.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+        osc.connect(gain); gain.connect(AC.destination);
+        osc.start(); osc.stop(AC.currentTime + dur);
+    },
+    shoot: () => Sound.play('square', 200, 50, 0.1, 0.05),
+    impact: (x, y) => Sound.play('sawtooth', 100, 10, 0.2, 0.2, x, y),
+    metal: (x, y) => Sound.play('triangle', 1200, 800, 0.1, 0.15, x, y),
+    explode: (x, y, isBoss) => {
+        Sound.play('sawtooth', 50, 10, isBoss?1.0:0.4, isBoss?0.8:0.4, x, y);
+        Sound.play('square', 100, 20, 0.5, 0.2, x, y);
+    },
+    alarm: () => Sound.play('sine', 400, 600, 1.0, 0.2),
+    crit: (x, y) => Sound.play('square', 600, 1200, 0.2, 0.1, x, y)
+};
+
+const Game = { paused: false, wave: 0, time: 0, camera: {x:0, y:0}, shake: 0, kills: 0, killStreak: 0, streakTimer: 0 };
+const Player = { x: MAP_SIZE/2, y: MAP_SIZE/2, ang: 0, hp: 100, maxHp: 100, shield: 50, maxShield: 50, shieldTimer: 0, xp: 0, nextXp: 100, lvl: 1, speed: 5, heat: 0, recoil: 0, stats: { dmg: 20, multi: 1, spread: 0.05, reload: 8, crit: 0.1 }, reloadTimer: 0, magnet: 150 };
+
+let enemies = [];
+let bullets = [];
+let particles = [];
+let texts = []; 
+let loots = [];
+
+const keys = {};
+let mouse = {x:0, y:0, down:false};
+
+window.onkeydown = e => keys[e.code] = true;
+window.onkeyup = e => keys[e.code] = false;
+window.onmousemove = e => { if(!IS_MOBILE) { mouse.x = e.clientX; mouse.y = e.clientY; } };
+window.onmousedown = () => { if(!IS_MOBILE) mouse.down = true; };
+window.onmouseup = () => { if(!IS_MOBILE) mouse.down = false; };
+
+function addDecal(x, y, type, angle=0) {
+    bgCtx.save();
+    bgCtx.translate(x, y);
+    bgCtx.rotate(angle);
+    if(type === 'tread') {
+        bgCtx.fillStyle = 'rgba(0,0,0,0.15)';
+        bgCtx.fillRect(-15, -10, 30, 4);
+        bgCtx.fillRect(-15, 6, 30, 4);
+    } else if(type === 'oil') {
+        bgCtx.fillStyle = 'rgba(0,0,0,0.5)';
+        bgCtx.beginPath(); bgCtx.arc(0,0, 10+Math.random()*15, 0, Math.PI*2); bgCtx.fill();
+    } else if(type === 'scorch') {
+        bgCtx.fillStyle = 'rgba(20,20,20,0.6)';
+        bgCtx.beginPath(); bgCtx.arc(0,0, 30+Math.random()*20, 0, Math.PI*2); bgCtx.fill();
+    }
+    bgCtx.restore();
+}
+
+function spawnText(x, y, txt, color, size=20) {
+    texts.push({x, y, txt, color, size, life: 60, vy: -2});
+}
+
+function spawnParticle(x, y, color, speed, count, life=1.0) {
+    for(let i=0; i<count; i++) {
+        particles.push({
+            x, y, vx: (Math.random()-0.5)*speed, vy: (Math.random()-0.5)*speed,
+            color, life, maxLife: life
+        });
+    }
+}
+
+function update() {
+    if(Game.paused || !gameStarted) return;
+    Game.time++;
+
+    let dx = 0, dy = 0;
+    if(IS_MOBILE) {
+        dx = mobileInput.x;
+        dy = mobileInput.y;
+    } else {
+        if(keys['KeyW']) dy = -1; if(keys['KeyS']) dy = 1;
+        if(keys['KeyA']) dx = -1; if(keys['KeyD']) dx = 1;
+    }
+    
+    if(dx!==0 || dy!==0) {
+        let d = IS_MOBILE ? 1 : Math.hypot(dx, dy);
+        Player.x += (dx/d) * Player.speed;
+        Player.y += (dy/d) * Player.speed;
+        if(Game.time % 5 === 0) addDecal(Player.x, Player.y, 'tread', Player.ang);
+    }
+
+    Player.x = Math.max(50, Math.min(MAP_SIZE-50, Player.x));
+    Player.y = Math.max(50, Math.min(MAP_SIZE-50, Player.y));
+    
+    if(!IS_MOBILE) {
+        Player.ang = Math.atan2((mouse.y + Game.camera.y) - Player.y, (mouse.x + Game.camera.x) - Player.x);
+    } else if(dx!==0 || dy!==0) {
+        Player.ang = Math.atan2(dy, dx);
+    }
+
+    if(Player.shieldTimer > 0) Player.shieldTimer--;
+    else if(Player.shield < Player.maxShield) Player.shield += 0.2;
+    if(Player.heat > 0) Player.heat -= 0.5;
+    if(Player.recoil > 0) Player.recoil *= 0.8;
+    if(Player.reloadTimer > 0) Player.reloadTimer--;
+
+    if(mouse.down && Player.reloadTimer <= 0) {
+        if(Player.heat < 100) {
+            Player.reloadTimer = Player.stats.reload;
+            Player.heat += 4;
+            Player.recoil = 10;
+            Sound.shoot();
+            for(let i=0; i<Player.stats.multi; i++) {
+                let spread = (Math.random()-0.5) * Player.stats.spread;
+                let ang = Player.ang + spread + (i - (Player.stats.multi-1)/2)*0.1;
+                bullets.push({
+                    x: Player.x + Math.cos(Player.ang)*30, y: Player.y + Math.sin(Player.ang)*30,
+                    vx: Math.cos(ang)*18, vy: Math.sin(ang)*18,
+                    team: 'player', dmg: Player.stats.dmg, life: 70
+                });
+            }
+        }
+    }
+
+    // Mermi ve düşman lojiği aynen devam eder...
+    for(let i=bullets.length-1; i>=0; i--) {
+        let b = bullets[i]; b.x += b.vx; b.y += b.vy; b.life--;
+        let hitBullet = false;
+        for(let j=bullets.length-1; j>=0; j--) {
+            let other = bullets[j];
+            if(b.team !== other.team && Math.hypot(b.x-other.x, b.y-other.y) < 15) {
+                bullets.splice(j, 1); hitBullet = true;
+                Sound.metal(b.x, b.y); spawnParticle(b.x, b.y, '#fff', 5, 5, 0.5); break;
+            }
+        }
+        if(hitBullet || b.life <= 0) { bullets.splice(i, 1); continue; }
+        if(b.team === 'player') {
+            for(let e of enemies) {
+                if(Math.hypot(b.x-e.x, b.y-e.y) < e.size) {
+                    let isCrit = Math.random() < Player.stats.crit;
+                    let dmg = isCrit ? b.dmg * 2 : b.dmg;
+                    e.hp -= dmg; bullets.splice(i, 1); Sound.impact(e.x, e.y);
+                    if(isCrit) Sound.crit(e.x, e.y);
+                    spawnText(e.x, e.y - 20, Math.floor(dmg), isCrit ? '#f1c40f' : '#fff', isCrit ? 30 : 20);
+                    if(e.hp <= 0 && !e.dead) killEnemy(e); break;
+                }
+            }
+        } else {
+            if(Math.hypot(b.x-Player.x, b.y-Player.y) < 25) { takeDamage(b.dmg); bullets.splice(i, 1); }
+        }
+    }
+
+    if(enemies.length === 0) startNextWave();
+    enemies.forEach((e, i) => {
+        if(e.dead) { enemies.splice(i,1); return; }
+        let dist = Math.hypot(Player.x - e.x, Player.y - e.y);
+        let ang = Math.atan2(Player.y - e.y, Player.x - e.x);
+        e.x += Math.cos(ang) * e.speed; e.y += Math.sin(ang) * e.speed; e.ang = ang;
+        if(e.type === 'kamikaze') {
+            if(dist < 40) { e.dead = true; takeDamage(50); Sound.explode(e.x, e.y, false); spawnParticle(e.x, e.y, 'red', 10, 20); addDecal(e.x, e.y, 'scorch'); }
+        } else if(dist < 500 && Game.time % (e.isBoss?20:60) === 0) {
+             bullets.push({ x: e.x, y: e.y, vx: Math.cos(ang)*10, vy: Math.sin(ang)*10, team: 'enemy', dmg: e.isBoss ? 20 : 10, life: 100 });
+        }
+    });
+
+    loots.forEach((l, i) => {
+        let dist = Math.hypot(Player.x - l.x, Player.y - l.y);
+        if(dist < Player.magnet) { l.x += (Player.x - l.x) * 0.1; l.y += (Player.y - l.y) * 0.1; }
+        if(dist < 30) {
+            if(l.type === 'xp') { Player.xp += l.val; if(Player.xp >= Player.nextXp) levelUp(); }
+            else { Player.hp = Math.min(Player.hp + 50, Player.maxHp); spawnText(Player.x, Player.y, "+50 CAN", "#2ecc71"); }
+            Sound.play('sine', 600, 1000, 0.1, 0.1); loots.splice(i, 1);
+        }
+    });
+
+    if(Game.streakTimer > 0) {
+        Game.streakTimer--;
+        if(Game.streakTimer === 0) { Game.killStreak = 0; document.getElementById('kill-streak').classList.remove('streak-active'); }
+    }
+
+    Game.camera.x = Player.x - WIDTH/2;
+    Game.camera.y = Player.y - HEIGHT/2;
+    if(Game.shake > 0) {
+        Game.camera.x += (Math.random()-0.5)*Game.shake;
+        Game.camera.y += (Math.random()-0.5)*Game.shake;
+        Game.shake *= 0.9;
+    }
+    updateUI();
+    requestAnimationFrame(update);
+}
+
+// Geri kalan yardımcı fonksiyonlar (takeDamage, killEnemy, vb.) aynen kalıyor...
+function takeDamage(amt) {
+    if(Player.shield > 0) { Player.shield -= amt; if(Player.shield < 0) { Player.hp += Player.shield; Player.shield = 0; } }
+    else Player.hp -= amt;
+    Player.shieldTimer = 180; Game.shake = 15; spawnText(Player.x, Player.y-40, "-" + amt, "red", 30); Sound.impact(Player.x, Player.y);
+    if(Player.hp <= 0) { alert("GÖREV BAŞARISIZ! Dalga: " + Game.wave); location.reload(); }
+}
+
+function killEnemy(e) {
+    e.dead = true; Game.kills++; Game.killStreak++; Game.streakTimer = 120;
+    if(Game.killStreak > 1) {
+        const kt = document.getElementById('kill-streak'); kt.innerText = Game.killStreak + "X KOMBO!"; kt.classList.add('streak-active');
+        setTimeout(() => kt.classList.remove('streak-active'), 200);
+    }
+    addDecal(e.x, e.y, 'oil'); addDecal(e.x, e.y, 'scorch'); spawnParticle(e.x, e.y, e.color, 4, 15);
+    Sound.explode(e.x, e.y, e.isBoss); Game.shake = e.isBoss ? 40 : 5;
+    loots.push({x: e.x, y: e.y, type:'xp', val: e.isBoss?500:25});
+    if(Math.random()<0.1) loots.push({x:e.x+20, y:e.y, type:'hp', val:0});
+}
+
+function startNextWave() {
+    Game.wave++; document.getElementById('wave-num').innerText = Game.wave;
+    if(Game.wave % 5 === 0) {
+        document.getElementById('boss-overlay').style.display = 'block'; document.getElementById('boss-text').style.display = 'block'; Sound.alarm();
+        setTimeout(() => { document.getElementById('boss-overlay').style.display = 'none'; document.getElementById('boss-text').style.display = 'none'; spawnEnemy(true); }, 4000);
+    } else {
+        let count = 5 + Math.floor(Game.wave * 1.5); for(let i=0; i<count; i++) spawnEnemy(false);
+    }
+}
+
+function spawnEnemy(isBoss) {
+    let ang = Math.random() * Math.PI*2; let dist = 800 + Math.random() * 400;
+    let type = 'normal';
+    if(!isBoss) { let r = Math.random(); if(r < 0.2) type = 'kamikaze'; else if(r < 0.4) type = 'tank'; }
+    enemies.push({ x: Player.x + Math.cos(ang)*dist, y: Player.y + Math.sin(ang)*dist, hp: isBoss ? 3000 * (Game.wave/5) : (type==='kamikaze'?50:150) + Game.wave*10, maxHp: isBoss ? 3000 : 150, speed: isBoss ? 2.5 : (type==='kamikaze'?7:3), size: isBoss ? 70 : (type==='kamikaze'?15:25), type, isBoss, color: isBoss ? '#c0392b' : (type==='kamikaze'?'#e74c3c':'#7f8c8d'), dead: false });
+}
+
+function levelUp() {
+    Game.paused = true; Player.xp = 0; Player.nextXp *= 1.2; Player.lvl++;
+    const opts = [
+        {t:"GATLING SİSTEMİ", d:"Namlu sayısını artırır.", i:"🔫", f:()=>{Player.stats.multi++;}},
+        {t:"URANYUM MERMİ", d:"Hasar %30 artar.", i:"☢️", f:()=>{Player.stats.dmg*=1.3;}},
+        {t:"LAZER NİŞANGAH", d:"Kritik şans +%15.", i:"🎯", f:()=>{Player.stats.crit+=0.15;}},
+        {t:"GELİŞMİŞ SOĞUTUCU", d:"Isıyı sıfırlar.", i:"❄️", f:()=>{Player.heat=0; Player.stats.reload*=0.9;}},
+        {t:"MANYETİK ÇEKİM", d:"Daha uzak menzil.", i:"🧲", f:()=>{Player.magnet+=100;}},
+        {t:"NANOTEK ONARIM", d:"Canı doldurur.", i:"🛡️", f:()=>{Player.maxHp+=50; Player.hp=Player.maxHp; Player.maxShield+=25; Player.shield=Player.maxShield;}}
+    ];
+    const c = document.getElementById('cards-wrapper'); c.innerHTML = '';
+    opts.sort(() => 0.5 - Math.random()).slice(0, 3).forEach(o => {
+        let div = document.createElement('div'); div.className = 'card'; div.innerHTML = `<div class="icon">${o.i}</div><h3>${o.t}</h3><p>${o.d}</p>`;
+        div.onclick = () => { o.f(); document.getElementById('upgrade-overlay').style.display = 'none'; Game.paused = false; };
+        c.appendChild(div);
+    });
+    document.getElementById('upgrade-overlay').style.display = 'flex';
+}
+
+function updateUI() {
+    document.getElementById('shield-bar').style.width = (Player.shield/Player.maxShield)*100 + '%';
+    document.getElementById('shield-txt').innerText = Math.floor(Player.shield);
+    document.getElementById('hp-bar').style.width = (Player.hp/Player.maxHp)*100 + '%';
+    document.getElementById('hp-txt').innerText = Math.floor(Player.hp);
+    document.getElementById('heat-bar').style.width = Player.heat + '%';
+    document.getElementById('heat-txt').innerText = Math.floor(Player.heat) + '%';
+    document.getElementById('xp-bar').style.width = (Player.xp/Player.nextXp)*100 + '%';
+    document.getElementById('lvl-txt').innerText = Player.lvl;
+    document.getElementById('enemy-count').innerText = enemies.length;
+    document.getElementById('kills').innerText = Game.kills;
+    let m = Math.floor(Game.time/3600); let s = Math.floor((Game.time%3600)/60);
+    document.getElementById('time').innerText = (m<10?"0":"")+m + ":" + (s<10?"0":"")+s;
+    document.getElementById('fps').innerText = "60"; 
+}
+
+function draw() {
+    if(!gameStarted) return;
+    let sx = Math.max(0, Game.camera.x); let sy = Math.max(0, Game.camera.y);
+    let sw = Math.min(MAP_SIZE - sx, WIDTH); let sh = Math.min(MAP_SIZE - sy, HEIGHT);
+    
+    if(sx < MAP_SIZE && sy < MAP_SIZE) {
+        ctx.drawImage(bgCanvas, sx, sy, sw, sh, (Game.camera.x<0?-Game.camera.x:0), (Game.camera.y<0?-Game.camera.y:0), sw, sh);
+    } else { ctx.fillStyle = '#000'; ctx.fillRect(0,0,WIDTH,HEIGHT); }
+    
+    ctx.fillStyle = 'rgba(230, 126, 34, 0.05)';
+    let stormX = (Game.time * 20) % WIDTH;
+    ctx.fillRect(stormX - WIDTH, 0, WIDTH, HEIGHT); ctx.fillRect(stormX, 0, WIDTH, HEIGHT);
+
+    ctx.save();
+    ctx.translate(-Game.camera.x, -Game.camera.y);
+
+    loots.forEach(l => {
+        ctx.shadowBlur = 15; ctx.shadowColor = l.type==='xp'?'gold':'lime';
+        ctx.fillStyle = l.type==='xp'?'gold':'lime';
+        ctx.beginPath(); ctx.arc(l.x, l.y, 6, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+    });
+
+    enemies.forEach(e => {
+        ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.ang);
+        ctx.fillStyle = '#111'; ctx.fillRect(-e.size, -e.size-4, e.size*2, 6); ctx.fillRect(-e.size, e.size-2, e.size*2, 6);
+        let grd = ctx.createLinearGradient(-e.size, -e.size, e.size, e.size); grd.addColorStop(0, e.color); grd.addColorStop(1, '#000');
+        ctx.fillStyle = grd;
+        if(e.type === 'kamikaze') {
+            ctx.beginPath(); ctx.moveTo(e.size, 0); ctx.lineTo(-e.size, e.size); ctx.lineTo(-e.size, -e.size); ctx.fill();
+            if(Game.time % 10 < 5) { ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fill(); }
+        } else {
+            ctx.fillRect(-e.size, -e.size, e.size*2, e.size*2);
+            ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(0,0,e.size*0.6, 0, Math.PI*2); ctx.fill();
+            ctx.fillRect(0, -e.size*0.1, e.size*1.2, e.size*0.2);
+        }
+        ctx.restore();
+        if(e.hp < e.maxHp) { ctx.fillStyle = 'red'; ctx.fillRect(e.x - e.size, e.y - e.size - 10, e.size*2 * (e.hp/e.maxHp), 4); }
+    });
+
+    ctx.save(); ctx.translate(Player.x, Player.y); ctx.rotate(Player.ang);
+    ctx.fillStyle = '#111'; ctx.fillRect(-22, -28, 44, 10); ctx.fillRect(-22, 18, 44, 10);
+    ctx.fillStyle = '#34495e'; ctx.fillRect(-20, -20, 40, 40); ctx.strokeStyle = '#555'; ctx.strokeRect(-20, -20, 40, 40);
+    if(Player.shield > 0) {
+        ctx.strokeStyle = `rgba(0, 255, 255, ${Player.shield/Player.maxShield * 0.5})`;
+        ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0,0,35,0,Math.PI*2); ctx.stroke();
+    }
+    let heatR = Math.min(255, 50 + Player.heat * 2); ctx.fillStyle = `rgb(${heatR}, 50, 50)`;
+    let rx = -Player.recoil;
+    if(Player.stats.multi === 1) { ctx.fillRect(10+rx, -6, 35, 12); } 
+    else if(Player.stats.multi === 2) { ctx.fillRect(10+rx, -10, 35, 8); ctx.fillRect(10+rx, 2, 35, 8); } 
+    else { ctx.fillRect(10+rx, -12, 35, 6); ctx.fillRect(10+rx, -3, 38, 6); ctx.fillRect(10+rx, 6, 35, 6); }
+    ctx.fillStyle = '#2c3e50'; ctx.beginPath(); ctx.arc(0,0,16,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#f1c40f'; ctx.fillRect(-5, -5, 10, 10);
+    ctx.restore();
+
+    bullets.forEach(b => {
+        ctx.fillStyle = b.team === 'player' ? '#f1c40f' : '#e74c3c';
+        ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle;
+        ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+    });
+
+    particles.forEach((p, i) => {
+        p.x += p.vx; p.y += p.vy; p.life -= 0.05; if(p.life <= 0) particles.splice(i, 1);
+        ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 4);
+    });
+    ctx.globalAlpha = 1;
+
+    texts.forEach((t, i) => {
+        t.y += t.vy; t.life--; if(t.life <= 0) texts.splice(i, 1);
+        ctx.fillStyle = t.color; ctx.font = `bold ${t.size}px 'Black Ops One'`;
+        ctx.lineWidth = 2; ctx.strokeStyle='black'; ctx.strokeText(t.txt, t.x, t.y); ctx.fillText(t.txt, t.x, t.y);
+    });
+
+    ctx.restore();
+
+    miniCtx.fillStyle = '#000'; miniCtx.fillRect(0,0,180,180);
+    let scale = 180 / MAP_SIZE;
+    miniCtx.fillStyle = '#0f0'; miniCtx.beginPath(); miniCtx.arc(Player.x*scale, Player.y*scale, 3, 0, Math.PI*2); miniCtx.fill();
+    miniCtx.fillStyle = 'red'; 
+    enemies.forEach(e => { let es = e.isBoss ? 4 : 2; miniCtx.fillRect(e.x*scale-es/2, e.y*scale-es/2, es, es); });
+
+    requestAnimationFrame(draw);
+}
+
+window.addEventListener('click', () => { if(AC.state==='suspended') AC.resume(); }, {once:true});
+</script>
+</body>
+</html>
